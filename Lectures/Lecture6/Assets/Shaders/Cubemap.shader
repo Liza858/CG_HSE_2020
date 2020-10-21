@@ -1,4 +1,4 @@
-﻿Shader "0_Custom/Cubemap"
+Shader "0_Custom/Cubemap"
 {
     Properties
     {
@@ -89,6 +89,33 @@
                 return a2 / (UNITY_PI * Sqr(NDotH2 * (a2 - 1) + 1));
             }
 
+            float3 GetRadienceByMontecarlo(float3 viewDir, float3 normal)
+            {
+                int N = 10000;
+                float3 resultRadience = float3(0.0, 0.0, 0.0);
+                float integralBrdfCosTheta = 0.0;
+
+                for (int i = 0; i < N; i++)
+                {
+                    float cosTheta = Random(i);
+                    float alpha = 2 * UNITY_PI * Random(i + N);
+                    float sinTheta = sqrt(1 - cosTheta * cosTheta);
+         
+                    float3 x = normalize(float3(0.0, normal.z, -normal.y));
+                    float3 y = cross(normal, x);
+
+                    float3 w = cosTheta * normal + sinTheta * cos(alpha) * x + sinTheta * sin(alpha) * y;
+   
+                    float f = GetSpecularBRDF(viewDir, w, normal) * cosTheta;
+
+                    integralBrdfCosTheta += f;
+                    
+                    resultRadience += SampleColor(w) * f;
+                }
+
+                return resultRadience / integralBrdfCosTheta; // (BRDF * dot(normal, w')) == 1
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 float3 normal = normalize(i.normal);
@@ -98,8 +125,8 @@
                 // Replace this specular calculation by Montecarlo.
                 // Normalize the BRDF in such a way, that integral over a hemysphere of (BRDF * dot(normal, w')) == 1
                 // TIP: use Random(i) to get a pseudo-random value.
-                float3 viewRefl = reflect(-viewDirection.xyz, normal);
-                float3 specular = SampleColor(viewRefl);
+
+                float3 specular = GetRadienceByMontecarlo(viewDirection, normal);
                 
                 return fixed4(specular, 1);
             }
