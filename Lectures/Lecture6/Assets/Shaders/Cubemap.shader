@@ -97,8 +97,8 @@ Shader "0_Custom/Cubemap"
 
                 for (int i = 0; i < N; i++)
                 {
-                    float cosTheta = Random(i);
-                    float alpha = 2 * UNITY_PI * Random(i + N);
+                    float cosTheta = Random(2*i);
+                    float alpha = 2 * UNITY_PI * Random(2*i + 1);
                     float sinTheta = sqrt(1 - cosTheta * cosTheta);
          
                     float3 x = normalize(float3(0.0, normal.z, -normal.y));
