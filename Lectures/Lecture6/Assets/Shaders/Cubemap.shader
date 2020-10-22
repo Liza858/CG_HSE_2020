@@ -91,22 +91,24 @@ Shader "0_Custom/Cubemap"
 
             float3 GetRadienceByMontecarlo(float3 viewDir, float3 normal)
             {
-                int N = 10000;
+                uint N = 10000;
                 float3 resultRadience = float3(0.0, 0.0, 0.0);
                 float integralBrdfCosTheta = 0.0;
 
-                for (int i = 0; i < N; i++)
+                for (uint i = 0; i < N; i++)
                 {
-                    float cosTheta = Random(2*i);
+                    float cosTheta = 2 * Random(2*i) - 1;
+
                     float alpha = 2 * UNITY_PI * Random(2*i + 1);
                     float sinTheta = sqrt(1 - cosTheta * cosTheta);
          
-                    float3 x = normalize(float3(0.0, normal.z, -normal.y));
-                    float3 y = cross(normal, x);
+                    float3 w = float3(sinTheta * cos(alpha), sinTheta * sin(alpha), cosTheta);
 
-                    float3 w = cosTheta * normal + sinTheta * cos(alpha) * x + sinTheta * sin(alpha) * y;
+                    if (dot(normal, w) < 0) {
+                        w = -w;
+                    }
    
-                    float f = GetSpecularBRDF(viewDir, w, normal) * cosTheta;
+                    float f = GetSpecularBRDF(viewDir, w, normal) * dot(normal, w);
 
                     integralBrdfCosTheta += f;
                     
