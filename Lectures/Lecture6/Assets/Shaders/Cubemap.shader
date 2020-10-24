@@ -68,7 +68,7 @@ Shader "0_Custom/Cubemap"
             
             float3 SampleColor(float3 direction)
             {   
-                half4 tex = texCUBE(_Cube, direction);
+                half4 tex = texCUBElod(_Cube, float4(direction, 0));
                 return DecodeHDR(tex, _Cube_HDR).rgb;
             }
             
