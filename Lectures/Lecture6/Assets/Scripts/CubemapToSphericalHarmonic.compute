@@ -1,4 +1,3 @@
-﻿﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel ComputeHarmonics
 
 #define PI            3.14159265359f
@@ -49,7 +48,7 @@ float3 SampleColor(float3 direction)
 void ComputeHarmonics(uint id : SV_DispatchThreadID)
 {
     const int THREADS = 1024;
-    const int SAMPLES = 100;
+    const int SAMPLES = 10000;
     
     // See SH.shader for more details
     float4 results[7] = {
@@ -63,7 +62,53 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
         
         float4(0, 0, 0, 0), // SH_2_rgb
     };
+
+    float3 L[9] = {
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0), 
+        float3(0.0, 0.0, 0.0)
+    };
+
+    for (int i = 0; i < SAMPLES; i++) {
+
+        float cosTheta = 2 * Random(2*i) - 1;
+        float alpha = TWO_PI * Random(2*i + 1);
+        float sinTheta = sqrt(1 - cosTheta * cosTheta);
+
+        float3 w = float3(sinTheta * cos(alpha), sinTheta * sin(alpha), cosTheta);
+        float3 color = SampleColor(w);  
+
+        L[0] += 1.0 * color; // 4pi * 1 / pi * pi * 1 / (2 * sqrt(pi)) * 1 / (2 * sqrt(pi))
+        L[1] += 2.0 * color * w.y ; // 4pi * 1 / pi * 2 * pi / 3 * (-sqrt(3) / (2 * sqrt(pi))) * (-sqrt(3) / (2 * sqrt(pi)))
+        L[2] += 2.0 * color * w.z;
+        L[3] += 2.0 * color * w.x ;  
+        L[4] += 15.0 / 4.0 * color * w.y * w.x;
+        L[5] += 15.0 / 4.0 * color * (w.y * w.z); 
+        L[6] += 5.0 / 16.0 * color * (3 * w.z * w.z - 1); 
+        L[7] += 15.0 / 4.0 * color * (w.x * w.z );
+        L[8] += 15.0 / 16.0 * color * (w.x * w.x - w.y * w.y);
+
+    }
+
+    for (int j = 0; j < 9; j++) {
+        L[j] = L[j] / SAMPLES;
+    }
+
+    results[0] = float4(L[3].x, L[1].x, L[2].x, L[0].x);
+    results[1] = float4(L[3].y, L[1].y, L[2].y, L[0].y);
+    results[2] = float4(L[3].z, L[1].z, L[2].z, L[0].z);
+    results[3] = float4(L[4].x, L[5].x, L[7].x, L[6].x);
+    results[4] = float4(L[4].y, L[5].y, L[7].y, L[6].y);
+    results[5] = float4(L[4].z, L[5].z, L[7].z, L[6].z);
+    results[6] = float4(L[8].xyz, 0);
     
+ 
     // Populate results buffer using monte-carlo method.
     // You can see the Random(i) function. Use it just as with the previous task.
     
