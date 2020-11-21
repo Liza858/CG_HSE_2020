@@ -1,4 +1,4 @@
-﻿Shader "Custom/POM"
+﻿﻿﻿Shader "Custom/POM"
 {
     Properties {
         // normal map texture on the material,
@@ -16,6 +16,8 @@
     }
     
     CGINCLUDE
+// Upgrade NOTE: excluded shader from DX11; has structs without semantics (struct v2f members bitangent)
+#pragma exclude_renderers d3d11
     #include "UnityCG.cginc"
     #include "UnityLightingCommon.cginc"
     
@@ -30,6 +32,9 @@
         // texture coordinate for the normal map
         float2 uv : TEXCOORD5;
         float4 clip : SV_POSITION;
+        half3 bitangent : TEXCOORD1;
+        half3 tangent : TEXCOORD2;
+        half3 normal : TEXCOORD3;
     };
 
     // Vertex shader now also gets a per-vertex tangent vector.
@@ -46,6 +51,10 @@
         o.worldSurfaceNormal = normal;
         
         // compute bitangent from cross product of normal and tangent and output it
+
+        o.normal = wNormal;
+        o.tangent = wTangent;
+        o.bitangent = UnityObjectToWorldDir(normalize(tangent.w * cross(normal, tangent)));
         
         return o;
     }
@@ -71,11 +80,38 @@
         float3 worldViewDir = normalize(i.worldPos.xyz - _WorldSpaceCameraPos.xyz);
 #if MODE_BUMP
         // Change UV according to the Parallax Offset Mapping
+        half3 dir = normalize(half3(dot(i.tangent, worldViewDir), dot(i.bitangent, worldViewDir), dot(i.normal, worldViewDir)));
+        float h = _MaxHeight * (1-tex2D(_HeightMap, uv).x);
+        uv -= h * dir.xy / dir.z;
 #endif   
     
         float depthDif = 0;
 #if MODE_POM | MODE_POM_SHADOWS    
         // Change UV according to Parallax Occclusion Mapping
+
+        half3 dir = normalize(half3(dot(i.tangent, worldViewDir), dot(i.bitangent, worldViewDir), dot(i.normal, worldViewDir)));
+        half3 pos = half3(0, 0, 0);
+        half3 prev = half3(0, 0, 0);
+        float prev_dh = 0;
+        float dh = 0;
+        float h = 0;
+        
+
+        bool flag = true;
+        for (int step = 0; step < _MaxStepCount; ++step) {
+	     if (flag) {
+		 prev = pos;
+		 pos = _StepLength * step * (-dir); 
+		 prev_dh = dh;
+		 h = _MaxHeight * tex2D(_HeightMap, uv + pos.xy).x;
+		 dh = abs(h - pos.z);
+		 if (h < pos.z) {
+		    flag = false;
+		 }
+	     }
+        }
+
+        uv += lerp(pos.xy, prev.xy, dh / (dh + prev_dh)); // интерполяция
 #endif
 
         float3 worldLightDir = normalize(_WorldSpaceLightPos0.xyz);
@@ -87,6 +123,9 @@
         half3 normal = i.worldSurfaceNormal;
 #if !MODE_PLAIN
         // Implement Normal Mapping
+
+        half3 color = UnpackNormal(tex2D(_NormalMap, uv));
+        normal = normalize(color.x * i.tangent + color.y * i.bitangent + color.z * i.normal);
 #endif
 
         // Diffuse lightning
